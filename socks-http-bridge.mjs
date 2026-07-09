@@ -7,6 +7,9 @@ const listenPort = Number(process.env.BRIDGE_LISTEN_PORT || "18083");
 const upstream = new URL(process.env.UPSTREAM_SOCKS || "socks5://127.0.0.1:1080");
 const upstreamHost = upstream.hostname;
 const upstreamPort = Number(upstream.port || "1080");
+const upstreamUsername = decodeURIComponent(upstream.username || "");
+const upstreamPassword = decodeURIComponent(upstream.password || "");
+const upstreamNeedsAuth = upstreamUsername.length > 0 || upstreamPassword.length > 0;
 const parentPid = process.ppid;
 const debug = process.env.BRIDGE_DEBUG === "1";
 
@@ -58,7 +61,7 @@ function socksConnect(targetHost, targetPort, initialPayload, client) {
   let chunks = [];
 
   upstreamSocket.on("connect", () => {
-    upstreamSocket.write(Buffer.from([0x05, 0x01, 0x00]));
+    upstreamSocket.write(Buffer.from([0x05, 0x01, upstreamNeedsAuth ? 0x02 : 0x00]));
   });
 
   upstreamSocket.on("data", (chunk) => {
@@ -68,28 +71,52 @@ function socksConnect(targetHost, targetPort, initialPayload, client) {
     if (stage === 0) {
       if (data.length < 2) return;
       chunks = [data.subarray(2)];
-      if (data[0] !== 0x05 || data[1] !== 0x00) {
-        debugLog(`SOCKS authentication failed: ${data[0]},${data[1]}`);
+      if (data[0] !== 0x05) {
+        debugLog(`SOCKS method negotiation failed: ${data[0]},${data[1]}`);
+        client.destroy(new Error("SOCKS authentication failed"));
+        upstreamSocket.destroy();
+        return;
+      }
+      if (data[1] === 0x02) {
+        const usernameBytes = Buffer.from(upstreamUsername);
+        const passwordBytes = Buffer.from(upstreamPassword);
+        if (usernameBytes.length > 255 || passwordBytes.length > 255) {
+          client.destroy(new Error("SOCKS username or password too long"));
+          upstreamSocket.destroy();
+          return;
+        }
+        const request = Buffer.alloc(3 + usernameBytes.length + passwordBytes.length);
+        request[0] = 0x01;
+        request[1] = usernameBytes.length;
+        usernameBytes.copy(request, 2);
+        request[2 + usernameBytes.length] = passwordBytes.length;
+        passwordBytes.copy(request, 3 + usernameBytes.length);
+        upstreamSocket.write(request);
+        stage = 10;
+        return;
+      }
+      if (data[1] !== 0x00) {
+        debugLog(`SOCKS authentication method unsupported: ${data[1]}`);
         client.destroy(new Error("SOCKS authentication failed"));
         upstreamSocket.destroy();
         return;
       }
 
-      const hostBytes = Buffer.from(targetHost);
-      if (hostBytes.length > 255) {
-        client.destroy(new Error("target host too long"));
+      sendConnectRequest(upstreamSocket, targetHost, targetPort, client);
+      stage = 1;
+    }
+
+    if (stage === 10) {
+      const authReply = Buffer.concat(chunks);
+      if (authReply.length < 2) return;
+      chunks = [authReply.subarray(2)];
+      if (authReply[1] !== 0x00) {
+        debugLog(`SOCKS username/password authentication failed: ${authReply[1]}`);
+        client.destroy(new Error("SOCKS authentication failed"));
         upstreamSocket.destroy();
         return;
       }
-      const request = Buffer.alloc(7 + hostBytes.length);
-      request[0] = 0x05;
-      request[1] = 0x01;
-      request[2] = 0x00;
-      request[3] = 0x03;
-      request[4] = hostBytes.length;
-      hostBytes.copy(request, 5);
-      request.writeUInt16BE(targetPort, 5 + hostBytes.length);
-      upstreamSocket.write(request);
+      sendConnectRequest(upstreamSocket, targetHost, targetPort, client);
       stage = 1;
     }
 
@@ -125,6 +152,24 @@ function socksConnect(targetHost, targetPort, initialPayload, client) {
     writeError(client, 502, "Bad Gateway");
   });
   client.on("error", () => upstreamSocket.destroy());
+}
+
+function sendConnectRequest(upstreamSocket, targetHost, targetPort, client) {
+  const hostBytes = Buffer.from(targetHost);
+  if (hostBytes.length > 255) {
+    client.destroy(new Error("target host too long"));
+    upstreamSocket.destroy();
+    return;
+  }
+  const request = Buffer.alloc(7 + hostBytes.length);
+  request[0] = 0x05;
+  request[1] = 0x01;
+  request[2] = 0x00;
+  request[3] = 0x03;
+  request[4] = hostBytes.length;
+  hostBytes.copy(request, 5);
+  request.writeUInt16BE(targetPort, 5 + hostBytes.length);
+  upstreamSocket.write(request);
 }
 
 const server = net.createServer((client) => {

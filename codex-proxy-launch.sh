@@ -26,6 +26,10 @@ log_command() {
 }
 
 log_debug "launcher started"
+
+redact_proxy_url() {
+  print -r -- "$1" | /usr/bin/sed -E 's#(socks5h?://)[^/@]+@#\1***@#; s#(https?://)[^/@]+@#\1***@#'
+}
 DEFAULT_BYPASS_ITEMS=(
   localhost
   127.0.0.1
@@ -143,9 +147,48 @@ proxy_port() {
   print -r -- "${(P)var}"
 }
 
+proxy_username() {
+  local var="PROXY_$(proxy_key "$1")_USERNAME"
+  print -r -- "${(P)var:-}"
+}
+
+proxy_password() {
+  local var="PROXY_$(proxy_key "$1")_PASSWORD"
+  print -r -- "${(P)var:-}"
+}
+
 proxy_bridge() {
   local var="PROXY_$(proxy_key "$1")_HTTP_BRIDGE"
   print -r -- "${(P)var:-0}"
+}
+
+url_encode_userinfo() {
+  emulate -L zsh
+  setopt local_options no_multibyte
+  local value="$1"
+  local result="" char encoded
+  local i
+  for (( i = 1; i <= ${#value}; i++ )); do
+    char="${value[i]}"
+    if [[ "${char}" == [A-Za-z0-9._~-] ]]; then
+      result+="${char}"
+    else
+      printf -v encoded '%%%02X' "'${char}"
+      result+="${encoded}"
+    fi
+  done
+  print -r -- "${result}"
+}
+
+proxy_userinfo() {
+  local username password
+  username="$(proxy_username "$1")"
+  password="$(proxy_password "$1")"
+  if [[ -z "${username}" && -z "${password}" ]]; then
+    print -r -- ""
+    return
+  fi
+  print -r -- "$(url_encode_userinfo "${username}"):$(url_encode_userinfo "${password}")@"
 }
 
 proxy_label() {
@@ -206,10 +249,14 @@ ensure_proxy_config() {
     PROXY_LOCAL_NAME="Local SOCKS"
     PROXY_LOCAL_HOST="${LOCAL_PROXY_HOST:-127.0.0.1}"
     PROXY_LOCAL_PORT="${LOCAL_PROXY_PORT:-1080}"
+    PROXY_LOCAL_USERNAME=""
+    PROXY_LOCAL_PASSWORD=""
     PROXY_LOCAL_HTTP_BRIDGE="1"
     PROXY_REMOTE_NAME="Remote SOCKS"
     PROXY_REMOTE_HOST="${REMOTE_PROXY_HOST:-proxy.example.com}"
     PROXY_REMOTE_PORT="${REMOTE_PROXY_PORT:-1080}"
+    PROXY_REMOTE_USERNAME=""
+    PROXY_REMOTE_PASSWORD=""
     PROXY_REMOTE_HTTP_BRIDGE="1"
   fi
 
@@ -246,6 +293,10 @@ save_config() {
       print -r -- "PROXY_${key}_HOST=$(config_quote "${value}")"
       value="$(proxy_port "${id}")"
       print -r -- "PROXY_${key}_PORT=$(config_quote "${value}")"
+      value="$(proxy_username "${id}")"
+      print -r -- "PROXY_${key}_USERNAME=$(config_quote "${value}")"
+      value="$(proxy_password "${id}")"
+      print -r -- "PROXY_${key}_PASSWORD=$(config_quote "${value}")"
       value="$(proxy_bridge "${id}")"
       print -r -- "PROXY_${key}_HTTP_BRIDGE=$(config_quote "${value}")"
       print -r -- ''
@@ -323,7 +374,7 @@ OSA
 }
 
 add_proxy() {
-  local id name host port bridge_button key
+  local id name host port username password bridge_button key
 
   name="$(prompt_text "Add Proxy" "Proxy name. Names must be unique." "")" || return 0
   if [[ -z "${name}" ]]; then
@@ -338,6 +389,8 @@ add_proxy() {
   if [[ ! "${port}" =~ '^[0-9]+$' ]]; then
     fail "Invalid proxy port: ${port}"
   fi
+  username="$(prompt_text "Add Proxy" "Optional SOCKS5 username for ${name}. Leave empty if not required." "")" || return 0
+  password="$(prompt_text "Add Proxy" "Optional SOCKS5 password for ${name}. Leave empty if not required." "")" || return 0
 
   bridge_button="$(
     /usr/bin/osascript - "${name}" <<'OSA'
@@ -352,6 +405,8 @@ OSA
   typeset -g "PROXY_${key}_NAME=${name}"
   typeset -g "PROXY_${key}_HOST=${host}"
   typeset -g "PROXY_${key}_PORT=${port}"
+  typeset -g "PROXY_${key}_USERNAME=${username}"
+  typeset -g "PROXY_${key}_PASSWORD=${password}"
   if [[ "${bridge_button}" == "Yes" ]]; then
     typeset -g "PROXY_${key}_HTTP_BRIDGE=1"
   else
@@ -362,7 +417,7 @@ OSA
 }
 
 edit_proxy() {
-  local labels=() label id key name host port bridge_button item
+  local labels=() label id key name host port username password bridge_button item
 
   for item in "${PROXY_IDS[@]}"; do
     labels+=("$(proxy_label "${item}")")
@@ -383,6 +438,8 @@ edit_proxy() {
   if [[ ! "${port}" =~ '^[0-9]+$' ]]; then
     fail "Invalid proxy port: ${port}"
   fi
+  username="$(prompt_text "Edit Proxy" "Optional SOCKS5 username for ${name}. Leave empty if not required." "$(proxy_username "${id}")")" || return 0
+  password="$(prompt_text "Edit Proxy" "Optional SOCKS5 password for ${name}. Leave empty if not required." "$(proxy_password "${id}")")" || return 0
 
   bridge_button="$(
     /usr/bin/osascript - "${name}" "$(proxy_bridge "${id}")" <<'OSA'
@@ -402,6 +459,8 @@ OSA
   typeset -g "PROXY_${key}_NAME=${name}"
   typeset -g "PROXY_${key}_HOST=${host}"
   typeset -g "PROXY_${key}_PORT=${port}"
+  typeset -g "PROXY_${key}_USERNAME=${username}"
+  typeset -g "PROXY_${key}_PASSWORD=${password}"
   if [[ "${bridge_button}" == "Yes" ]]; then
     typeset -g "PROXY_${key}_HTTP_BRIDGE=1"
   else
@@ -568,17 +627,23 @@ fi
 PROXY_HOST="$(proxy_host "${ACTIVE_PROXY}")"
 PROXY_PORT="$(proxy_port "${ACTIVE_PROXY}")"
 PROXY_URL_HOST="$(proxy_url_host "${PROXY_HOST}")"
-PROXY_ENV="socks5h://${PROXY_URL_HOST}:${PROXY_PORT}"
-PROXY_CHROMIUM="socks5://${PROXY_URL_HOST}:${PROXY_PORT}"
+PROXY_USERINFO="$(proxy_userinfo "${ACTIVE_PROXY}")"
+PROXY_ENV="socks5h://${PROXY_USERINFO}${PROXY_URL_HOST}:${PROXY_PORT}"
+PROXY_CHROMIUM="socks5://${PROXY_USERINFO}${PROXY_URL_HOST}:${PROXY_PORT}"
 CHROMIUM_PROXY="${PROXY_CHROMIUM}"
 build_bypass_lists
 NO_PROXY_LIST="${BYPASS_PROXY_LIST},${PROXY_HOST}"
 HOST_RESOLVER_RULES="${CHROMIUM_HOST_RESOLVER_RULES:-}"
 log_debug "proxy host: ${PROXY_HOST}"
 log_debug "proxy port: ${PROXY_PORT}"
+if [[ -n "$(proxy_username "${ACTIVE_PROXY}")" || -n "$(proxy_password "${ACTIVE_PROXY}")" ]]; then
+  log_debug "proxy authentication: enabled"
+else
+  log_debug "proxy authentication: disabled"
+fi
 log_debug "proxy bridge enabled: $(proxy_bridge "${ACTIVE_PROXY}")"
-log_debug "initial env proxy: ${PROXY_ENV}"
-log_debug "initial chromium proxy: ${CHROMIUM_PROXY}"
+log_debug "initial env proxy scheme: socks5h"
+log_debug "initial chromium proxy scheme: socks5"
 log_debug "no_proxy: ${NO_PROXY_LIST}"
 log_debug "host resolver rules: ${HOST_RESOLVER_RULES}"
 
@@ -670,7 +735,7 @@ LAUNCH_ENV_VARS=(
 
 for var in "${LAUNCH_ENV_VARS[@]}"; do
   /bin/launchctl setenv "${var}" "${(P)var}" >/dev/null 2>&1 || true
-  log_debug "launchctl setenv ${var}=${(P)var}"
+  log_debug "launchctl setenv ${var}=$(redact_proxy_url "${(P)var}")"
 done
 
 codex_process_pids() {
@@ -688,14 +753,14 @@ codex_is_running() {
   [[ -n "$(codex_process_pids)" ]]
 }
 
-log_debug "open args: ${CODEX_ARGS[*]}"
+log_debug "open args: $(redact_proxy_url "${CODEX_ARGS[*]}")"
 /usr/bin/open -n /Applications/Codex.app --args "${CODEX_ARGS[@]}"
 OPEN_STATUS=$?
 log_debug "open status: ${OPEN_STATUS}"
 sleep 2
 log_debug "Codex pids after open: $(join_by " " "${(@f)$(codex_process_pids)}")"
 for pid in "${(@f)$(codex_process_pids)}"; do
-  log_command "Codex process ${pid}" /bin/ps eww -p "${pid}" -o command
+  log_command "Codex process ${pid}" /bin/ps -p "${pid}" -o pid=,comm=
 done
 
 cleanup_launch_env() {

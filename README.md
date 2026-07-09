@@ -17,7 +17,7 @@
 
 - 只影响 Codex Desktop，不改变系统全局代理。
 - 不需要开启全局 VPN，也不依赖复杂分流软件。
-- 支持多个 SOCKS5 代理配置。
+- 支持多个 SOCKS5 代理配置，可选用户名/密码认证。
 - 支持本地 HTTP CONNECT bridge，改善某些内部 HTTP 客户端对 SOCKS5 支持不完整导致的问题，例如插件市场加载异常。
 - 支持配置直连排除列表，例如本机地址、局域网地址、内网域名。
 - 支持英文/中文界面快速切换，默认英文。
@@ -43,7 +43,7 @@
    ```
 
 2. 打开 `Codex Proxy.app`。
-3. 在 `Proxies` 页面配置代理名称、SOCKS5 host、端口，以及是否启用 HTTP bridge。
+3. 在 `Proxies` 页面配置代理名称、SOCKS5 host、端口、可选用户名/密码，以及是否启用 HTTP bridge。
 4. 在 `Bypass` 页面配置不走代理的地址、域名、IP 或 CIDR。
 5. 点击 `Save` 保存配置，或点击 `Launch Codex` 保存配置并启动 Codex。
 
@@ -91,6 +91,8 @@ fe80::/10
 
 真实代理配置保存在本机的 `codex-proxy.conf` 中，可能包含私有代理地址、内网域名或个人网络信息。这个文件已被 `.gitignore` 忽略，仓库只提供 `codex-proxy.conf.example` 作为公开模板。
 
+如果 SOCKS5 代理需要用户名/密码认证，可以在界面中填写 `Username` 和 `Password`。不需要认证时保持为空即可。当前版本会把这些值保存在本机配置文件中，请不要公开分享你的真实 `codex-proxy.conf`。
+
 ## 构建
 
 这个 App 是单文件 AppKit 程序，可以用系统自带 Swift 编译器重新构建，不需要第三方依赖：
@@ -106,6 +108,6 @@ CLANG_MODULE_CACHE_PATH=.build/clang-module-cache \
 
 Codex Proxy is a small macOS launcher for starting Codex Desktop with per-app proxy settings. It lets Codex use a SOCKS5 proxy without changing the system proxy, enabling a global VPN, or routing other applications through proxy/splitting software.
 
-It supports multiple SOCKS5 profiles, an optional local HTTP CONNECT bridge, an editable bypass list, English/Chinese UI switching, and a prompt for relaunching Codex when it is already running.
+It supports multiple SOCKS5 profiles with optional username/password authentication, an optional local HTTP CONNECT bridge, an editable bypass list, English/Chinese UI switching, and a prompt for relaunching Codex when it is already running.
 
 Use `codex-proxy.conf.example` as the public template. Keep your real `codex-proxy.conf` private.

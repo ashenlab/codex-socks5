@@ -5,6 +5,8 @@ struct ProxyConfig {
     var name: String
     var host: String
     var port: String
+    var username: String
+    var password: String
     var bridge: Bool
 }
 
@@ -92,6 +94,8 @@ final class ConfigStore {
                 name: parseScalar(values["PROXY_\(key)_NAME"] ?? "\"\(id)\""),
                 host: parseScalar(values["PROXY_\(key)_HOST"] ?? "\"\""),
                 port: parseScalar(values["PROXY_\(key)_PORT"] ?? "\"1080\""),
+                username: parseScalar(values["PROXY_\(key)_USERNAME"] ?? "\"\""),
+                password: parseScalar(values["PROXY_\(key)_PASSWORD"] ?? "\"\""),
                 bridge: parseScalar(values["PROXY_\(key)_HTTP_BRIDGE"] ?? "\"0\"") == "1"
             ))
         }
@@ -125,6 +129,8 @@ final class ConfigStore {
             lines.append("PROXY_\(key)_NAME=\(quote(proxy.name))")
             lines.append("PROXY_\(key)_HOST=\(quote(proxy.host))")
             lines.append("PROXY_\(key)_PORT=\(quote(proxy.port))")
+            lines.append("PROXY_\(key)_USERNAME=\(quote(proxy.username))")
+            lines.append("PROXY_\(key)_PASSWORD=\(quote(proxy.password))")
             lines.append("PROXY_\(key)_HTTP_BRIDGE=\(quote(proxy.bridge ? "1" : "0"))")
             lines.append("")
         }
@@ -142,8 +148,8 @@ final class ConfigStore {
         LauncherConfig(
             activeProxy: "local",
             proxies: [
-                ProxyConfig(id: "local", name: "Local SOCKS", host: "127.0.0.1", port: "1080", bridge: true),
-                ProxyConfig(id: "remote", name: "Remote SOCKS", host: "proxy.example.com", port: "1080", bridge: true)
+                ProxyConfig(id: "local", name: "Local SOCKS", host: "127.0.0.1", port: "1080", username: "", password: "", bridge: true),
+                ProxyConfig(id: "remote", name: "Remote SOCKS", host: "proxy.example.com", port: "1080", username: "", password: "", bridge: true)
             ],
             bypassItems: defaultBypassItems()
         )
@@ -254,7 +260,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     private var language = AppLanguage(rawValue: UserDefaults.standard.string(forKey: "AppLanguage") ?? "en") ?? .english
 
     private let window = NSWindow(
-        contentRect: NSRect(x: 0, y: 0, width: 820, height: 548),
+        contentRect: NSRect(x: 0, y: 0, width: 820, height: 610),
         styleMask: [.titled, .closable, .miniaturizable],
         backing: .buffered,
         defer: false
@@ -265,6 +271,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     private let nameField = NSTextField()
     private let hostField = NSTextField()
     private let portField = NSTextField()
+    private let usernameField = NSTextField()
+    private let passwordField = NSSecureTextField()
     private let bridgeCheck = NSButton(checkboxWithTitle: "Use local HTTP bridge", target: nil, action: nil)
     private let bridgeHelpButton = NSButton()
     private let currentLabel = NSTextField(labelWithString: "")
@@ -281,6 +289,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     private let nameLabel = NSTextField(labelWithString: "")
     private let hostLabel = NSTextField(labelWithString: "")
     private let portLabel = NSTextField(labelWithString: "")
+    private let usernameLabel = NSTextField(labelWithString: "")
+    private let passwordLabel = NSTextField(labelWithString: "")
     private let bridgeHostLabel = NSTextField(labelWithString: "")
     private let bridgePortLabel = NSTextField(labelWithString: "")
     private let addBypassButton = NSButton()
@@ -317,6 +327,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
             "name": "Name",
             "socksHost": "SOCKS Host",
             "socksPort": "SOCKS Port",
+            "username": "Username",
+            "password": "Password",
             "bridgeHost": "Bridge Host",
             "bridgePort": "Bridge Port",
             "useBridge": "Use local HTTP bridge",
@@ -360,6 +372,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
             "name": "名称",
             "socksHost": "SOCKS 主机",
             "socksPort": "SOCKS 端口",
+            "username": "用户名",
+            "password": "密码",
             "bridgeHost": "Bridge 主机",
             "bridgePort": "Bridge 端口",
             "useBridge": "启用本地 HTTP bridge",
@@ -406,6 +420,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         nameLabel.stringValue = tr("name")
         hostLabel.stringValue = tr("socksHost")
         portLabel.stringValue = tr("socksPort")
+        usernameLabel.stringValue = tr("username")
+        passwordLabel.stringValue = tr("password")
         bridgeHostLabel.stringValue = tr("bridgeHost")
         bridgePortLabel.stringValue = tr("bridgePort")
         bridgeCheck.title = tr("useBridge")
@@ -453,7 +469,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         tabs.addTabViewItem(proxyTabItem)
         tabs.addTabViewItem(bypassTabItem)
         root.addArrangedSubview(tabs)
-        tabs.heightAnchor.constraint(equalToConstant: 398).isActive = true
+        tabs.heightAnchor.constraint(equalToConstant: 460).isActive = true
 
         let footer = NSStackView()
         footer.orientation = .horizontal
@@ -538,18 +554,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
             [nameLabel, nameField],
             [hostLabel, hostField],
             [portLabel, portField],
+            [usernameLabel, usernameField],
+            [passwordLabel, passwordField],
             [bridgeHostLabel, bridgeHostField],
             [bridgePortLabel, bridgePortField],
             [NSView(), bridgeRow]
         ])
-        for field in [nameLabel, hostLabel, portLabel, bridgeHostLabel, bridgePortLabel] {
+        for field in [nameLabel, hostLabel, portLabel, usernameLabel, passwordLabel, bridgeHostLabel, bridgePortLabel] {
             field.textColor = .secondaryLabelColor
         }
         form.column(at: 0).xPlacement = .trailing
         form.column(at: 1).width = 330
         form.rowSpacing = 10
         form.columnSpacing = 10
-        for field in [nameField, hostField, portField, bridgeHostField, bridgePortField] {
+        for field in [nameField, hostField, portField, usernameField, passwordField, bridgeHostField, bridgePortField] {
             field.target = self
             field.action = #selector(fieldsChanged)
         }
@@ -636,6 +654,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         nameField.stringValue = proxy.name
         hostField.stringValue = proxy.host
         portField.stringValue = proxy.port
+        usernameField.stringValue = proxy.username
+        passwordField.stringValue = proxy.password
         bridgeCheck.state = proxy.bridge ? .on : .off
         bridgeHostField.stringValue = config.httpBridgeHost
         bridgePortField.stringValue = config.httpBridgePort
@@ -657,6 +677,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         config.proxies[index].name = nameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         config.proxies[index].host = hostField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         config.proxies[index].port = portField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        config.proxies[index].username = usernameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        config.proxies[index].password = passwordField.stringValue
         config.proxies[index].bridge = bridgeCheck.state == .on
         config.httpBridgeHost = bridgeHostField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         config.httpBridgePort = bridgePortField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -697,7 +719,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         saveFieldsToSelectedProxy()
         let baseName = uniqueProxyName("New Proxy")
         let id = store.generatedID(for: baseName, existing: config.proxies)
-        config.proxies.append(ProxyConfig(id: id, name: baseName, host: "127.0.0.1", port: "1080", bridge: true))
+        config.proxies.append(ProxyConfig(id: id, name: baseName, host: "127.0.0.1", port: "1080", username: "", password: "", bridge: true))
         config.activeProxy = id
         reloadAll()
         clearStatus()
@@ -914,7 +936,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
             let proxy = config.proxies[row]
             let marker = proxy.id == config.activeProxy ? "● " : "  "
             let bridge = proxy.bridge ? "bridge" : "socks"
-            textField.stringValue = "\(marker)\(proxy.name)   \(proxy.host):\(proxy.port)   \(bridge)"
+            let auth = proxy.username.isEmpty && proxy.password.isEmpty ? "" : " auth"
+            textField.stringValue = "\(marker)\(proxy.name)   \(proxy.host):\(proxy.port)   \(bridge)\(auth)"
         } else {
             textField.stringValue = config.bypassItems[row]
         }
