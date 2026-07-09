@@ -363,7 +363,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
             "alreadyRunningInfo": "Proxy changes only apply when Codex starts.\n\nQuit the running Codex and relaunch with the selected proxy, or cancel and keep the current session.",
             "quitRelaunch": "Quit and Relaunch",
             "quitFailedTitle": "Codex is still running",
-            "quitFailedInfo": "Codex did not quit within a few seconds. Please quit it manually, then launch again."
+            "quitFailedInfo": "Codex or one of its helper processes did not quit within a few seconds. Please quit Codex manually, then launch again."
         ]
         let zh: [String: String] = [
             "title": "Codex Proxy",
@@ -409,7 +409,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
             "alreadyRunningInfo": "代理配置只会在 Codex 启动时生效。\n\n请退出正在运行的 Codex，并用当前代理配置重新启动；或取消并保留当前会话。",
             "quitRelaunch": "退出并重启",
             "quitFailedTitle": "Codex 仍在运行",
-            "quitFailedInfo": "Codex 在几秒内没有退出。请手动退出后再启动。"
+            "quitFailedInfo": "Codex 或它的辅助进程在几秒内没有退出。请手动退出 Codex 后再启动。"
         ]
         return (language == .english ? en : zh)[key] ?? key
     }
@@ -858,9 +858,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         }
     }
 
+    private func commandOutput(_ executable: String, _ arguments: [String]) -> String {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8) ?? ""
+        } catch {
+            return ""
+        }
+    }
+
+    private func runningCodexProcessIDs() -> [Int32] {
+        let output = commandOutput("/usr/bin/pgrep", ["-f", "/Applications/Codex.app/Contents"])
+        return output
+            .split(whereSeparator: \.isNewline)
+            .compactMap { Int32($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+            .filter { pid in
+                pid != ProcessInfo.processInfo.processIdentifier
+                    && !commandOutput("/bin/ps", ["-p", "\(pid)", "-o", "command="]).contains("socks-http-bridge.mjs")
+            }
+    }
+
+    private func codexHasFullyExited() -> Bool {
+        runningCodexApps().isEmpty && runningCodexProcessIDs().isEmpty
+    }
+
     private func handleRunningCodexIfNeeded() -> Bool {
         let runningApps = runningCodexApps()
-        if runningApps.isEmpty { return true }
+        if runningApps.isEmpty && runningCodexProcessIDs().isEmpty { return true }
 
         let alert = NSAlert()
         alert.alertStyle = .warning
@@ -874,9 +906,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
             for app in runningApps {
                 app.terminate()
             }
-            let deadline = Date().addingTimeInterval(6)
+            let deadline = Date().addingTimeInterval(15)
             while Date() < deadline {
-                if runningCodexApps().isEmpty {
+                if codexHasFullyExited() {
                     return true
                 }
                 RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.2))
