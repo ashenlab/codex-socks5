@@ -793,13 +793,15 @@ cleanup_launch_env() {
 }
 
 if [[ "${OPEN_STATUS}" -eq 0 ]]; then
-  for _ in {1..60}; do
-    codex_is_running && break
-    sleep 0.5
-  done
-  while codex_is_running; do
-    sleep 5
-  done
+  log_debug "waiting for Codex main process ${CODEX_MAIN_PID}"
+  wait "${CODEX_MAIN_PID}" || OPEN_STATUS=$?
+  log_debug "Codex main process exited with status ${OPEN_STATUS}"
+  if codex_is_running; then
+    log_debug "Codex helper processes are still running; waiting for process group to end"
+    while codex_is_running; do
+      sleep 5
+    done
+  fi
 fi
 
 cleanup_launch_env
