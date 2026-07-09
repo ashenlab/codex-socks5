@@ -661,7 +661,41 @@ if ! /usr/bin/nc -z -w 5 "${PROXY_HOST}" "${PROXY_PORT}" >/dev/null 2>&1; then
 fi
 log_debug "TCP check passed for ${PROXY_HOST}:${PROXY_PORT}"
 
+codex_process_pids() {
+  local pid command
+  for pid in "${(@f)$("/usr/bin/pgrep" -f /Applications/Codex.app/Contents 2>/dev/null || true)}"; do
+    [[ -n "${pid}" ]] || continue
+    command="$(/bin/ps -p "${pid}" -o command= 2>/dev/null || true)"
+    [[ -n "${command}" ]] || continue
+    [[ "${command}" != *"socks-http-bridge.mjs"* ]] || continue
+    print -r -- "${pid}"
+  done
+}
+
+codex_is_running() {
+  [[ -n "$(codex_process_pids)" ]]
+}
+
+cleanup_stale_proxy_helpers_if_safe() {
+  local pid command
+  if codex_is_running; then
+    log_debug "Codex is still running; skip stale bridge cleanup"
+    return 0
+  fi
+  for pid in "${(@f)$("/usr/bin/pgrep" -f "codex-proxy-launch.sh|socks-http-bridge.mjs" 2>/dev/null || true)}"; do
+    [[ -n "${pid}" ]] || continue
+    [[ "${pid}" != "$$" ]] || continue
+    command="$(/bin/ps -p "${pid}" -o command= 2>/dev/null || true)"
+    [[ -n "${command}" ]] || continue
+    if [[ "${command}" == *"codex-proxy-launch.sh"* || "${command}" == *"socks-http-bridge.mjs"* ]]; then
+      log_debug "stopping stale proxy helper ${pid}: ${command}"
+      /bin/kill "${pid}" >/dev/null 2>&1 || true
+    fi
+  done
+}
+
 if [[ "$(proxy_bridge "${ACTIVE_PROXY}")" == "1" ]]; then
+  cleanup_stale_proxy_helpers_if_safe
   BRIDGE_HOST="${HTTP_BRIDGE_HOST:-127.0.0.1}"
   BRIDGE_PORT="${HTTP_BRIDGE_PORT:-18083}"
   while /usr/bin/nc -z "${BRIDGE_HOST}" "${BRIDGE_PORT}" >/dev/null 2>&1; do
@@ -713,6 +747,7 @@ export no_proxy="${NO_PROXY_LIST}"
 if [[ ! -x /Applications/Codex.app/Contents/MacOS/Codex ]]; then
   fail "Cannot find executable: /Applications/Codex.app/Contents/MacOS/Codex"
 fi
+CODEX_EXECUTABLE="/Applications/Codex.app/Contents/MacOS/Codex"
 
 CODEX_ARGS=(
   "--proxy-server=${CHROMIUM_PROXY}"
@@ -738,27 +773,13 @@ for var in "${LAUNCH_ENV_VARS[@]}"; do
   log_debug "launchctl setenv ${var}=$(redact_proxy_url "${(P)var}")"
 done
 
-codex_process_pids() {
-  local pid command
-  for pid in "${(@f)$("/usr/bin/pgrep" -f /Applications/Codex.app/Contents 2>/dev/null || true)}"; do
-    [[ -n "${pid}" ]] || continue
-    command="$(/bin/ps -p "${pid}" -o command= 2>/dev/null || true)"
-    [[ -n "${command}" ]] || continue
-    [[ "${command}" != *"socks-http-bridge.mjs"* ]] || continue
-    print -r -- "${pid}"
-  done
-}
-
-codex_is_running() {
-  [[ -n "$(codex_process_pids)" ]]
-}
-
-log_debug "open args: $(redact_proxy_url "${CODEX_ARGS[*]}")"
-/usr/bin/open -n /Applications/Codex.app --args "${CODEX_ARGS[@]}"
-OPEN_STATUS=$?
-log_debug "open status: ${OPEN_STATUS}"
+log_debug "launch args: $(redact_proxy_url "${CODEX_ARGS[*]}")"
+"${CODEX_EXECUTABLE}" "${CODEX_ARGS[@]}" >> "${DEBUG_OUTPUT}" 2>&1 &
+CODEX_MAIN_PID=$!
+OPEN_STATUS=0
+log_debug "Codex main pid: ${CODEX_MAIN_PID}"
 sleep 2
-log_debug "Codex pids after open: $(join_by " " "${(@f)$(codex_process_pids)}")"
+log_debug "Codex pids after launch: $(join_by " " "${(@f)$(codex_process_pids)}")"
 for pid in "${(@f)$(codex_process_pids)}"; do
   log_command "Codex process ${pid}" /bin/ps -p "${pid}" -o pid=,comm=
 done
