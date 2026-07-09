@@ -673,14 +673,28 @@ for var in "${LAUNCH_ENV_VARS[@]}"; do
   log_debug "launchctl setenv ${var}=${(P)var}"
 done
 
+codex_process_pids() {
+  local pid command
+  for pid in "${(@f)$("/usr/bin/pgrep" -f /Applications/Codex.app/Contents 2>/dev/null || true)}"; do
+    [[ -n "${pid}" ]] || continue
+    command="$(/bin/ps -p "${pid}" -o command= 2>/dev/null || true)"
+    [[ -n "${command}" ]] || continue
+    [[ "${command}" != *"socks-http-bridge.mjs"* ]] || continue
+    print -r -- "${pid}"
+  done
+}
+
+codex_is_running() {
+  [[ -n "$(codex_process_pids)" ]]
+}
+
 log_debug "open args: ${CODEX_ARGS[*]}"
 /usr/bin/open -n /Applications/Codex.app --args "${CODEX_ARGS[@]}"
 OPEN_STATUS=$?
 log_debug "open status: ${OPEN_STATUS}"
 sleep 2
-log_command "Codex pids after open" /usr/bin/pgrep -f /Applications/Codex.app/Contents
-CODEX_PIDS=("${(@f)$("/usr/bin/pgrep" -f /Applications/Codex.app/Contents 2>/dev/null)}")
-for pid in "${CODEX_PIDS[@]}"; do
+log_debug "Codex pids after open: $(join_by " " "${(@f)$(codex_process_pids)}")"
+for pid in "${(@f)$(codex_process_pids)}"; do
   log_command "Codex process ${pid}" /bin/ps eww -p "${pid}" -o command
 done
 
@@ -694,10 +708,10 @@ cleanup_launch_env() {
 
 if [[ "${OPEN_STATUS}" -eq 0 ]]; then
   for _ in {1..60}; do
-    /usr/bin/pgrep -f /Applications/Codex.app/Contents >/dev/null 2>&1 && break
+    codex_is_running && break
     sleep 0.5
   done
-  while /usr/bin/pgrep -f /Applications/Codex.app/Contents >/dev/null 2>&1; do
+  while codex_is_running; do
     sleep 5
   done
 fi
