@@ -1,0 +1,21 @@
+# Active proxy id. Edit through Codex Proxy, or update this file manually.
+ACTIVE_PROXY="local"
+
+# Configured SOCKS5 proxies.
+PROXY_IDS=(local remote)
+PROXY_LOCAL_NAME="Local SOCKS"
+PROXY_LOCAL_HOST="127.0.0.1"
+PROXY_LOCAL_PORT="1080"
+PROXY_LOCAL_HTTP_BRIDGE="1"
+
+PROXY_REMOTE_NAME="Remote SOCKS"
+PROXY_REMOTE_HOST="proxy.example.com"
+PROXY_REMOTE_PORT="1080"
+PROXY_REMOTE_HTTP_BRIDGE="1"
+
+# Local HTTP CONNECT bridge used when a proxy enables HTTP bridge mode.
+HTTP_BRIDGE_HOST="127.0.0.1"
+HTTP_BRIDGE_PORT="18083"
+
+# Hosts, domains, IPs, or CIDRs that should connect directly.
+BYPASS_ITEMS=("localhost" "127.0.0.1" "::1" "*.local" "local" "10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16" "169.254.0.0/16" "fc00::/7" "fe80::/10")

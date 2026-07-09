@@ -1,0 +1,8 @@
+.DS_Store
+.build/
+*.app/
+codex-proxy.conf
+codex-proxy-debug.log
+*.log
+*.netlog
+*.pid
