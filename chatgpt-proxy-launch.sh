@@ -344,7 +344,7 @@ save_config() {
 
     print -r -- '# Local HTTP CONNECT bridge used when a proxy enables HTTP bridge mode.'
     print -r -- "HTTP_BRIDGE_HOST=$(config_quote "${HTTP_BRIDGE_HOST:-127.0.0.1}")"
-    print -r -- "HTTP_BRIDGE_PORT=$(config_quote "${HTTP_BRIDGE_PORT:-18083}")"
+    print -r -- "HTTP_BRIDGE_PORT=$(config_quote "${HTTP_BRIDGE_PORT:-28083}")"
     print -r -- ''
     print -r -- '# Hosts, domains, IPs, or CIDRs that should connect directly.'
     print -r -- '# This starts with local/LAN defaults, but every item is editable in the launcher.'
@@ -740,7 +740,7 @@ cleanup_idle_legacy_bridges() {
 if [[ "$(proxy_bridge "${ACTIVE_PROXY}")" == "1" ]]; then
   cleanup_idle_legacy_bridges
   BRIDGE_HOST="${HTTP_BRIDGE_HOST:-127.0.0.1}"
-  BRIDGE_PORT="${HTTP_BRIDGE_PORT:-18083}"
+  BRIDGE_PORT="${HTTP_BRIDGE_PORT:-28083}"
   while /usr/bin/nc -z "${BRIDGE_HOST}" "${BRIDGE_PORT}" >/dev/null 2>&1; do
     (( BRIDGE_PORT++ ))
   done

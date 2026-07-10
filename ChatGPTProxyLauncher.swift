@@ -14,7 +14,7 @@ struct LauncherConfig {
     var activeProxy: String = "lan"
     var proxies: [ProxyConfig] = []
     var httpBridgeHost: String = "127.0.0.1"
-    var httpBridgePort: String = "18083"
+    var httpBridgePort: String = "28083"
     var bypassItems: [String] = []
 }
 
@@ -113,7 +113,7 @@ final class ConfigStore {
             activeProxy: proxies.contains(where: { $0.id == active }) ? active : proxies[0].id,
             proxies: proxies,
             httpBridgeHost: parseScalar(values["HTTP_BRIDGE_HOST"] ?? "\"127.0.0.1\""),
-            httpBridgePort: parseScalar(values["HTTP_BRIDGE_PORT"] ?? "\"18083\""),
+            httpBridgePort: parseScalar(values["HTTP_BRIDGE_PORT"] ?? "\"28083\""),
             bypassItems: bypass.isEmpty ? defaultBypassItems() : bypass
         )
     }
