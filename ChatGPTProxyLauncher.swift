@@ -37,10 +37,10 @@ final class ConfigStore {
         resourcesURL = bundleURL.appendingPathComponent("Contents/Resources")
         legacyProjectURL = bundleURL.deletingLastPathComponent()
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        supportURL = appSupport.appendingPathComponent("Codex Proxy", isDirectory: true)
-        configURL = supportURL.appendingPathComponent("codex-proxy.conf")
-        exampleConfigURL = resourcesURL.appendingPathComponent("codex-proxy.conf.example")
-        scriptURL = resourcesURL.appendingPathComponent("codex-proxy-launch.sh")
+        supportURL = appSupport.appendingPathComponent("ChatGPT Proxy", isDirectory: true)
+        configURL = supportURL.appendingPathComponent("chatgpt-proxy.conf")
+        exampleConfigURL = resourcesURL.appendingPathComponent("chatgpt-proxy.conf.example")
+        scriptURL = resourcesURL.appendingPathComponent("chatgpt-proxy-launch.sh")
         migrateLegacyConfigIfNeeded()
     }
 
@@ -52,14 +52,16 @@ final class ConfigStore {
         }
         guard !fm.fileExists(atPath: configURL.path) else { return }
 
-        let oldSupportURL = appSupport.appendingPathComponent("Codex Proxy Launcher", isDirectory: true)
-        let oldSupportConfigURL = oldSupportURL.appendingPathComponent("codex-proxy.conf")
-        if fm.fileExists(atPath: oldSupportConfigURL.path) {
+        let oldSupportURLs = [
+            appSupport.appendingPathComponent("Codex Proxy", isDirectory: true).appendingPathComponent("codex-proxy.conf"),
+            appSupport.appendingPathComponent("Codex Proxy Launcher", isDirectory: true).appendingPathComponent("codex-proxy.conf")
+        ]
+        for oldSupportConfigURL in oldSupportURLs where fm.fileExists(atPath: oldSupportConfigURL.path) {
             try? fm.copyItem(at: oldSupportConfigURL, to: configURL)
             return
         }
 
-        let legacyConfigURL = legacyProjectURL.appendingPathComponent("codex-proxy.conf")
+        let legacyConfigURL = legacyProjectURL.appendingPathComponent("chatgpt-proxy.conf")
         if fm.fileExists(atPath: legacyConfigURL.path) {
             try? fm.copyItem(at: legacyConfigURL, to: configURL)
             return
@@ -119,7 +121,7 @@ final class ConfigStore {
     func save(_ config: LauncherConfig) throws {
         let proxyIDs = config.proxies.map(\.id).joined(separator: " ")
         var lines: [String] = []
-        lines.append("# Active proxy id. Edit through Codex Proxy, or update this file manually.")
+        lines.append("# Active proxy id. Edit through ChatGPT Proxy, or update this file manually.")
         lines.append("ACTIVE_PROXY=\(quote(config.activeProxy))")
         lines.append("")
         lines.append("# Configured SOCKS5 proxies.")
@@ -320,8 +322,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
 
     private func tr(_ key: String) -> String {
         let en: [String: String] = [
-            "title": "Codex Proxy",
-            "subtitle": "Choose a proxy, tune direct-connect bypasses, then launch Codex.",
+            "title": "ChatGPT Proxy",
+            "subtitle": "Choose a proxy, tune direct-connect bypasses, then launch ChatGPT.",
             "language": "Language",
             "proxies": "Proxies",
             "bypass": "Bypass",
@@ -343,7 +345,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
             "resetDefaults": "Reset Defaults",
             "cancel": "Cancel",
             "save": "Save",
-            "launch": "Launch Codex",
+            "launch": "Launch ChatGPT",
             "current": "Current",
             "none": "None",
             "saved": "Saved.",
@@ -357,17 +359,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
             "proxyHostRequiredInfo": "%@ needs a SOCKS host.",
             "proxyPortInvalid": "Proxy port is invalid",
             "proxyPortInvalidInfo": "%@ needs a numeric SOCKS port.",
-            "unableLaunch": "Unable to launch Codex",
+            "unableLaunch": "Unable to launch ChatGPT",
             "missingScript": "Cannot find executable script:\n%@",
-            "alreadyRunningTitle": "Codex is already running",
-            "alreadyRunningInfo": "Proxy changes only apply when Codex starts.\n\nQuit the running Codex and relaunch with the selected proxy, or cancel and keep the current session.",
+            "alreadyRunningTitle": "ChatGPT is already running",
+            "alreadyRunningInfo": "Proxy changes only apply when ChatGPT starts.\n\nQuit the running ChatGPT and relaunch with the selected proxy, or cancel and keep the current session.",
             "quitRelaunch": "Quit and Relaunch",
-            "quitFailedTitle": "Codex is still running",
-            "quitFailedInfo": "Codex did not quit within a few seconds. Please quit it manually, then launch again."
+            "quitFailedTitle": "ChatGPT is still running",
+            "quitFailedInfo": "ChatGPT did not quit within a few seconds. Please quit it manually, then launch again."
         ]
         let zh: [String: String] = [
-            "title": "Codex Proxy",
-            "subtitle": "选择代理、配置直连排除项，然后启动 Codex。",
+            "title": "ChatGPT Proxy",
+            "subtitle": "选择代理、配置直连排除项，然后启动 ChatGPT。",
             "language": "语言",
             "proxies": "代理",
             "bypass": "直连排除",
@@ -389,7 +391,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
             "resetDefaults": "恢复默认",
             "cancel": "取消",
             "save": "保存",
-            "launch": "启动 Codex",
+            "launch": "启动 ChatGPT",
             "current": "当前",
             "none": "无",
             "saved": "已保存。",
@@ -403,13 +405,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
             "proxyHostRequiredInfo": "%@ 需要 SOCKS 主机地址。",
             "proxyPortInvalid": "代理端口无效",
             "proxyPortInvalidInfo": "%@ 需要数字端口。",
-            "unableLaunch": "无法启动 Codex",
+            "unableLaunch": "无法启动 ChatGPT",
             "missingScript": "找不到可执行脚本：\n%@",
-            "alreadyRunningTitle": "Codex 已经在运行",
-            "alreadyRunningInfo": "代理配置只会在 Codex 启动时生效。\n\n请退出正在运行的 Codex，并用当前代理配置重新启动；或取消并保留当前会话。",
+            "alreadyRunningTitle": "ChatGPT 已经在运行",
+            "alreadyRunningInfo": "代理配置只会在 ChatGPT 启动时生效。\n\n请退出正在运行的 ChatGPT，并用当前代理配置重新启动；或取消并保留当前会话。",
             "quitRelaunch": "退出并重启",
-            "quitFailedTitle": "Codex 仍在运行",
-            "quitFailedInfo": "Codex 在几秒内没有退出。请手动退出后再启动。"
+            "quitFailedTitle": "ChatGPT 仍在运行",
+            "quitFailedInfo": "ChatGPT 在几秒内没有退出。请手动退出后再启动。"
         ]
         return (language == .english ? en : zh)[key] ?? key
     }
@@ -832,10 +834,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         guard validateConfig() else { return }
         do {
             try store.save(config)
-            if !handleRunningCodexIfNeeded() {
+            if !handleRunningChatGPTIfNeeded() {
                 return
             }
-            try launchCodex()
+            try launchChatGPT()
             NSApp.terminate(nil)
         } catch {
             showError(tr("unableLaunch"), error.localizedDescription)
@@ -846,20 +848,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         statusLabel.stringValue = ""
     }
 
-    private func runningCodexApps() -> [NSRunningApplication] {
+    private func runningChatGPTApps() -> [NSRunningApplication] {
         NSWorkspace.shared.runningApplications.filter { app in
             if app.processIdentifier == ProcessInfo.processInfo.processIdentifier {
                 return false
             }
-            if app.bundleURL?.lastPathComponent == "Codex.app" {
+            if app.bundleURL?.lastPathComponent == "ChatGPT.app" {
                 return true
             }
-            return app.localizedName == "Codex"
+            return app.localizedName == "ChatGPT"
         }
     }
 
-    private func handleRunningCodexIfNeeded() -> Bool {
-        let runningApps = runningCodexApps()
+    private func handleRunningChatGPTIfNeeded() -> Bool {
+        let runningApps = runningChatGPTApps()
         if runningApps.isEmpty { return true }
 
         let alert = NSAlert()
@@ -876,7 +878,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
             }
             let deadline = Date().addingTimeInterval(6)
             while Date() < deadline {
-                if runningCodexApps().isEmpty {
+                if runningChatGPTApps().isEmpty {
                     return true
                 }
                 RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.2))
@@ -888,9 +890,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         }
     }
 
-    private func launchCodex() throws {
+    private func launchChatGPT() throws {
         guard FileManager.default.isExecutableFile(atPath: store.scriptURL.path) else {
-            throw NSError(domain: "CodexProxyLauncher", code: 1, userInfo: [
+            throw NSError(domain: "ChatGPTProxyLauncher", code: 1, userInfo: [
                 NSLocalizedDescriptionKey: String(format: tr("missingScript"), store.scriptURL.path)
             ])
         }
@@ -898,7 +900,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
         process.arguments = [store.scriptURL.path]
         var env = ProcessInfo.processInfo.environment
-        env["CODEX_PROXY_SKIP_UI"] = "1"
+        env["CHATGPT_PROXY_SKIP_UI"] = "1"
         process.environment = env
         try process.run()
     }

@@ -137,7 +137,7 @@ function socksConnect(targetHost, targetPort, initialPayload, client) {
       }
 
       debugLog(`SOCKS connected ${targetHost}:${targetPort}`);
-      client.write("HTTP/1.1 200 Connection Established\r\nProxy-Agent: codex-socks-http-bridge\r\n\r\n");
+      client.write("HTTP/1.1 200 Connection Established\r\nProxy-Agent: chatgpt-socks-http-bridge\r\n\r\n");
       if (initialPayload.length > 0) upstreamSocket.write(initialPayload);
       const leftover = Buffer.concat(chunks);
       if (leftover.length > 0) client.write(leftover);

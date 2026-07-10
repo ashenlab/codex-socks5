@@ -2,19 +2,23 @@
 set -eu
 
 SCRIPT_DIR="${0:A:h}"
-SUPPORT_DIR="${HOME}/Library/Application Support/Codex Proxy"
-CONFIG_FILE="${CODEX_PROXY_CONFIG_FILE:-${SUPPORT_DIR}/codex-proxy.conf}"
-EXAMPLE_CONFIG_FILE="${CODEX_PROXY_EXAMPLE_CONFIG_FILE:-${SCRIPT_DIR}/codex-proxy.conf.example}"
-DEBUG_LOG_FILE="${SUPPORT_DIR}/codex-proxy-debug.log"
+SUPPORT_DIR="${HOME}/Library/Application Support/ChatGPT Proxy"
+LEGACY_SUPPORT_DIR="${HOME}/Library/Application Support/Codex Proxy"
+CONFIG_FILE="${CHATGPT_PROXY_CONFIG_FILE:-${SUPPORT_DIR}/chatgpt-proxy.conf}"
+EXAMPLE_CONFIG_FILE="${CHATGPT_PROXY_EXAMPLE_CONFIG_FILE:-${SCRIPT_DIR}/chatgpt-proxy.conf.example}"
+DEBUG_LOG_FILE="${SUPPORT_DIR}/chatgpt-proxy-debug.log"
 /bin/mkdir -p "${SUPPORT_DIR}"
+if [[ ! -f "${CONFIG_FILE}" && -f "${LEGACY_SUPPORT_DIR}/codex-proxy.conf" ]]; then
+  /bin/cp "${LEGACY_SUPPORT_DIR}/codex-proxy.conf" "${CONFIG_FILE}"
+fi
 DEBUG_OUTPUT="/dev/null"
-if [[ "${CODEX_PROXY_DEBUG:-0}" == "1" ]]; then
+if [[ "${CHATGPT_PROXY_DEBUG:-0}" == "1" ]]; then
   : > "${DEBUG_LOG_FILE}"
   DEBUG_OUTPUT="${DEBUG_LOG_FILE}"
 fi
 
 log_debug() {
-  [[ "${CODEX_PROXY_DEBUG:-0}" == "1" ]] || return 0
+  [[ "${CHATGPT_PROXY_DEBUG:-0}" == "1" ]] || return 0
   print -r -- "[$(/bin/date '+%F %T')] $*" >> "${DEBUG_LOG_FILE}"
 }
 
@@ -45,7 +49,7 @@ DEFAULT_BYPASS_ITEMS=(
 )
 
 fail() {
-  /usr/bin/osascript -e "display dialog \"Codex Proxy failed:\n\n$*\" buttons {\"OK\"} default button \"OK\" with icon stop" >/dev/null 2>&1 || true
+  /usr/bin/osascript -e "display dialog \"ChatGPT Proxy failed:\n\n$*\" buttons {\"OK\"} default button \"OK\" with icon stop" >/dev/null 2>&1 || true
   exit 1
 }
 
@@ -280,7 +284,7 @@ ensure_proxy_config() {
 save_config() {
   local id key value bypass_items=()
   {
-    print -r -- '# Active proxy id. Edit through Codex Proxy, or update this file manually.'
+    print -r -- '# Active proxy id. Edit through ChatGPT Proxy, or update this file manually.'
     print -r -- "ACTIVE_PROXY=$(config_quote "${ACTIVE_PROXY}")"
     print -r -- ''
     print -r -- '# Configured SOCKS5 proxies.'
@@ -497,7 +501,7 @@ delete_proxy() {
 manage_proxies() {
   local action
   while true; do
-    action="$(choose_from_list "Proxy Manager" "Manage Codex proxy configurations." "Add Proxy" "Edit Proxy" "Delete Proxy" "Back")" || return 0
+    action="$(choose_from_list "Proxy Manager" "Manage ChatGPT proxy configurations." "Add Proxy" "Edit Proxy" "Delete Proxy" "Back")" || return 0
     case "${action}" in
       "Add Proxy")
         add_proxy
@@ -576,7 +580,7 @@ choose_active_proxy() {
   for item in "${PROXY_IDS[@]}"; do
     labels+=("$(proxy_label "${item}")")
   done
-  label="$(choose_from_list "Choose Proxy" "Choose a proxy for this Codex launch." "${labels[@]}")" || return 0
+  label="$(choose_from_list "Choose Proxy" "Choose a proxy for this ChatGPT launch." "${labels[@]}")" || return 0
   ACTIVE_PROXY="$(proxy_id_for_label "${label}")"
   save_config
 }
@@ -590,7 +594,7 @@ select_active_proxy() {
       labels+=("$(proxy_label "${item}")")
     done
     current_label="$(proxy_label "${ACTIVE_PROXY}")"
-    action="$(choose_from_list_default "Codex Proxy" "Select a proxy, then click OK to launch Codex." "${current_label}" "${labels[@]}" "Manage Proxies..." "Manage Bypass List...")" || exit 0
+    action="$(choose_from_list_default "ChatGPT Proxy" "Select a proxy, then click OK to launch ChatGPT." "${current_label}" "${labels[@]}" "Manage Proxies..." "Manage Bypass List...")" || exit 0
     case "${action}" in
       "Manage Proxies...")
         manage_proxies
@@ -619,7 +623,7 @@ source "${CONFIG_FILE}"
 ensure_proxy_config
 log_debug "config loaded from ${CONFIG_FILE}"
 log_debug "active proxy id: ${ACTIVE_PROXY}"
-if [[ "${CODEX_PROXY_SKIP_UI:-0}" != "1" ]]; then
+if [[ "${CHATGPT_PROXY_SKIP_UI:-0}" != "1" ]]; then
   select_active_proxy
   log_debug "active proxy after UI: ${ACTIVE_PROXY}"
 fi
@@ -651,7 +655,7 @@ if [[ "${PROXY_HOST}" != "127.0.0.1" && "${PROXY_HOST}" != "localhost" ]]; then
   log_debug "checking DNS for ${PROXY_HOST}"
   if ! /usr/bin/dscacheutil -q host -a name "${PROXY_HOST}" >/dev/null 2>&1 && [[ "${PROXY_HOST}" != *":"* ]]; then
     log_debug "DNS check failed for ${PROXY_HOST}"
-    fail "Cannot resolve ${PROXY_HOST}. Check DNS, or edit codex-proxy.conf and set PROXY_$(proxy_key "${ACTIVE_PROXY}")_HOST to an IP address directly."
+    fail "Cannot resolve ${PROXY_HOST}. Check DNS, or edit chatgpt-proxy.conf and set PROXY_$(proxy_key "${ACTIVE_PROXY}")_HOST to an IP address directly."
   fi
 fi
 log_debug "checking TCP connection to ${PROXY_HOST}:${PROXY_PORT}"
@@ -661,9 +665,9 @@ if ! /usr/bin/nc -z -w 5 "${PROXY_HOST}" "${PROXY_PORT}" >/dev/null 2>&1; then
 fi
 log_debug "TCP check passed for ${PROXY_HOST}:${PROXY_PORT}"
 
-codex_process_pids() {
+chatgpt_process_pids() {
   local pid command
-  for pid in "${(@f)$("/usr/bin/pgrep" -f /Applications/Codex.app/Contents 2>/dev/null || true)}"; do
+  for pid in "${(@f)$("/usr/bin/pgrep" -f /Applications/ChatGPT.app/Contents 2>/dev/null || true)}"; do
     [[ -n "${pid}" ]] || continue
     command="$(/bin/ps -p "${pid}" -o command= 2>/dev/null || true)"
     [[ -n "${command}" ]] || continue
@@ -672,22 +676,22 @@ codex_process_pids() {
   done
 }
 
-codex_is_running() {
-  [[ -n "$(codex_process_pids)" ]]
+chatgpt_is_running() {
+  [[ -n "$(chatgpt_process_pids)" ]]
 }
 
 cleanup_stale_proxy_helpers_if_safe() {
   local pid command
-  if codex_is_running; then
-    log_debug "Codex is still running; skip stale bridge cleanup"
+  if chatgpt_is_running; then
+    log_debug "ChatGPT is still running; skip stale bridge cleanup"
     return 0
   fi
-  for pid in "${(@f)$("/usr/bin/pgrep" -f "codex-proxy-launch.sh|socks-http-bridge.mjs" 2>/dev/null || true)}"; do
+  for pid in "${(@f)$("/usr/bin/pgrep" -f "chatgpt-proxy-launch.sh|socks-http-bridge.mjs" 2>/dev/null || true)}"; do
     [[ -n "${pid}" ]] || continue
     [[ "${pid}" != "$$" ]] || continue
     command="$(/bin/ps -p "${pid}" -o command= 2>/dev/null || true)"
     [[ -n "${command}" ]] || continue
-    if [[ "${command}" == *"codex-proxy-launch.sh"* || "${command}" == *"socks-http-bridge.mjs"* ]]; then
+    if [[ "${command}" == *"chatgpt-proxy-launch.sh"* || "${command}" == *"socks-http-bridge.mjs"* ]]; then
       log_debug "stopping stale proxy helper ${pid}: ${command}"
       /bin/kill "${pid}" >/dev/null 2>&1 || true
     fi
@@ -703,7 +707,7 @@ if [[ "$(proxy_bridge "${ACTIVE_PROXY}")" == "1" ]]; then
   done
   BRIDGE_PROXY_ENV="http://${BRIDGE_HOST}:${BRIDGE_PORT}"
   log_debug "bridge proxy env: ${BRIDGE_PROXY_ENV}"
-  BRIDGE_NODE="/Applications/Codex.app/Contents/Resources/cua_node/bin/node"
+  BRIDGE_NODE="/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node"
   if [[ ! -x "${BRIDGE_NODE}" ]]; then
     BRIDGE_CMD=(/usr/bin/env node)
   else
@@ -715,7 +719,7 @@ if [[ "$(proxy_bridge "${ACTIVE_PROXY}")" == "1" ]]; then
   BRIDGE_LISTEN_PORT="${BRIDGE_PORT}" \
   UPSTREAM_SOCKS="${PROXY_CHROMIUM}" \
   BRIDGE_WATCH_PARENT=0 \
-  BRIDGE_DEBUG="${CODEX_PROXY_DEBUG:-0}" \
+  BRIDGE_DEBUG="${CHATGPT_PROXY_DEBUG:-0}" \
     "${BRIDGE_CMD[@]}" "${SCRIPT_DIR}/socks-http-bridge.mjs" >> "${DEBUG_OUTPUT}" 2>&1 &
   BRIDGE_PID=$!
   log_debug "bridge pid: ${BRIDGE_PID}"
@@ -744,17 +748,17 @@ export https_proxy="${PROXY_ENV}"
 export NO_PROXY="${NO_PROXY_LIST}"
 export no_proxy="${NO_PROXY_LIST}"
 
-if [[ ! -x /Applications/Codex.app/Contents/MacOS/Codex ]]; then
-  fail "Cannot find executable: /Applications/Codex.app/Contents/MacOS/Codex"
+if [[ ! -x /Applications/ChatGPT.app/Contents/MacOS/ChatGPT ]]; then
+  fail "Cannot find executable: /Applications/ChatGPT.app/Contents/MacOS/ChatGPT"
 fi
-CODEX_EXECUTABLE="/Applications/Codex.app/Contents/MacOS/Codex"
+CHATGPT_EXECUTABLE="/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"
 
-CODEX_ARGS=(
+CHATGPT_ARGS=(
   "--proxy-server=${CHROMIUM_PROXY}"
   "--proxy-bypass-list=${BYPASS_PROXY_CHROMIUM};${PROXY_HOST}"
 )
 if [[ -n "${HOST_RESOLVER_RULES}" ]]; then
-  CODEX_ARGS+=("--host-resolver-rules=${HOST_RESOLVER_RULES}")
+  CHATGPT_ARGS+=("--host-resolver-rules=${HOST_RESOLVER_RULES}")
 fi
 
 LAUNCH_ENV_VARS=(
@@ -773,15 +777,15 @@ for var in "${LAUNCH_ENV_VARS[@]}"; do
   log_debug "launchctl setenv ${var}=$(redact_proxy_url "${(P)var}")"
 done
 
-log_debug "launch args: $(redact_proxy_url "${CODEX_ARGS[*]}")"
-"${CODEX_EXECUTABLE}" "${CODEX_ARGS[@]}" >> "${DEBUG_OUTPUT}" 2>&1 &
-CODEX_MAIN_PID=$!
+log_debug "launch args: $(redact_proxy_url "${CHATGPT_ARGS[*]}")"
+"${CHATGPT_EXECUTABLE}" "${CHATGPT_ARGS[@]}" >> "${DEBUG_OUTPUT}" 2>&1 &
+CHATGPT_MAIN_PID=$!
 OPEN_STATUS=0
-log_debug "Codex main pid: ${CODEX_MAIN_PID}"
+log_debug "ChatGPT main pid: ${CHATGPT_MAIN_PID}"
 sleep 2
-log_debug "Codex pids after launch: $(join_by " " "${(@f)$(codex_process_pids)}")"
-for pid in "${(@f)$(codex_process_pids)}"; do
-  log_command "Codex process ${pid}" /bin/ps -p "${pid}" -o pid=,comm=
+log_debug "ChatGPT pids after launch: $(join_by " " "${(@f)$(chatgpt_process_pids)}")"
+for pid in "${(@f)$(chatgpt_process_pids)}"; do
+  log_command "ChatGPT process ${pid}" /bin/ps -p "${pid}" -o pid=,comm=
 done
 
 cleanup_launch_env() {
@@ -793,12 +797,12 @@ cleanup_launch_env() {
 }
 
 if [[ "${OPEN_STATUS}" -eq 0 ]]; then
-  log_debug "waiting for Codex main process ${CODEX_MAIN_PID}"
-  wait "${CODEX_MAIN_PID}" || OPEN_STATUS=$?
-  log_debug "Codex main process exited with status ${OPEN_STATUS}"
-  if codex_is_running; then
-    log_debug "Codex helper processes are still running; waiting for process group to end"
-    while codex_is_running; do
+  log_debug "waiting for ChatGPT main process ${CHATGPT_MAIN_PID}"
+  wait "${CHATGPT_MAIN_PID}" || OPEN_STATUS=$?
+  log_debug "ChatGPT main process exited with status ${OPEN_STATUS}"
+  if chatgpt_is_running; then
+    log_debug "ChatGPT helper processes are still running; waiting for process group to end"
+    while chatgpt_is_running; do
       sleep 5
     done
   fi
@@ -807,7 +811,7 @@ fi
 cleanup_launch_env
 
 if [[ -n "${BRIDGE_PID:-}" ]]; then
-  log_debug "Codex process group ended; stopping bridge ${BRIDGE_PID}"
+  log_debug "ChatGPT process group ended; stopping bridge ${BRIDGE_PID}"
   kill "${BRIDGE_PID}" >/dev/null 2>&1 || true
 fi
 

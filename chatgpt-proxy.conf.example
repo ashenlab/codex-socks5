@@ -1,4 +1,4 @@
-# Active proxy id. Edit through Codex Proxy, or update this file manually.
+# Active proxy id. Edit through ChatGPT Proxy, or update this file manually.
 ACTIVE_PROXY="local"
 
 # Configured SOCKS5 proxies.

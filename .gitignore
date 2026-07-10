@@ -3,6 +3,8 @@
 *.app/
 codex-proxy.conf
 codex-proxy-debug.log
+chatgpt-proxy.conf
+chatgpt-proxy-debug.log
 *.log
 *.netlog
 *.pid

@@ -1,121 +1,84 @@
-# Codex Proxy
+# ChatGPT Proxy
 
-一个 macOS 小启动器，用来让 Codex Desktop 只通过你指定的 SOCKS5 代理访问网络，而不修改系统代理、不开启全局 VPN，也不要求安装额外的分流软件。
+[English](#english) | 简体中文
 
-## 项目目的
+一个原生 macOS 启动器，让 **ChatGPT Desktop** 仅通过指定的 SOCKS5 代理访问网络。它不会修改系统代理、不会开启全局 VPN，也不需要额外的分流软件。
 
-在一些网络环境下，Codex Desktop 需要通过海外代理才能正常登录、对话或访问插件市场。常见做法是打开系统全局代理、VPN，或者使用分流软件接管整机流量，但这些方式可能带来副作用：
+## 为什么使用它？
 
-- 其他国内网站或应用也被代理，访问变慢或异常。
-- 系统 DNS、路由、证书、规则匹配被额外软件影响。
-- 分流规则需要维护，且不同软件对系统流量的接管方式不完全透明。
-- 调试 Codex 网络问题时，很难确认请求到底走了哪条链路。
+有些网络环境中，ChatGPT Desktop 需要代理才能正常登录、对话或访问插件市场。系统全局代理、VPN 或分流软件会影响整台机器的流量，可能让国内服务、DNS、路由或其他应用出现不必要的延迟和异常。
 
-这个项目的目标是把影响范围收窄到 Codex 本身：启动器只给 Codex 进程注入代理环境变量和 Chromium 启动参数，让 Codex 通过指定 SOCKS5 代理访问网络，机器上的其他软件仍然保持原来的网络行为。
+ChatGPT Proxy 只在启动 ChatGPT 时注入代理环境变量与 Chromium 代理参数。ChatGPT 走指定 SOCKS5 代理，机器上的其他应用继续按原来的网络路径访问。
 
-## 优点
+## 功能
 
-- 只影响 Codex Desktop，不改变系统全局代理。
-- 不需要开启全局 VPN，也不依赖复杂分流软件。
-- 支持多个 SOCKS5 代理配置，可选用户名/密码认证。
-- 支持本地 HTTP CONNECT bridge，改善某些内部 HTTP 客户端对 SOCKS5 支持不完整导致的问题，例如插件市场加载异常。
-- 支持配置直连排除列表，例如本机地址、局域网地址、内网域名。
-- 支持英文/中文界面快速切换，默认英文。
-- 如果 Codex 已经在运行，会提示选择“退出并重启”或“取消”，避免代理配置看起来变了但旧进程没有生效。
-- 配置文件本地保存，私有配置默认不会进入 git。
+- 仅代理 ChatGPT Desktop，不改动系统网络设置。
+- 可保存多个 SOCKS5 配置，支持用户名/密码认证。
+- 可配置直连排除项，包括本机、局域网、域名、IP 和 CIDR。
+- 可选本地 HTTP CONNECT bridge，改善部分内部 HTTP 客户端对 SOCKS5 支持不完整造成的对话或插件市场异常。
+- 原生 AppKit 界面，支持英文/中文快速切换。
+- 当 ChatGPT 已运行时提示退出并重新启动，避免代理配置未真正生效。
 
-## 文件说明
+## 要求
 
-- `Codex Proxy.app`：发布包中的原生 macOS 启动器界面。
-- `CodexProxyLauncher.swift`：启动器 UI 源码。
-- `codex-proxy-launch.sh`：实际启动 Codex 并注入代理参数的脚本。
-- `socks-http-bridge.mjs`：本地 HTTP CONNECT 到 SOCKS5 的转发桥。
-- `CodexProxyIcon.png`：原创生成的图标源图，不包含第三方品牌标志。
-- `codex-proxy.conf.example`：公开配置模板。
-- `codex-proxy.conf`：你的本地私有配置，已被 `.gitignore` 忽略。
+- macOS 10.13 或更高版本。
+- 已安装新版 ChatGPT Desktop，路径为 `/Applications/ChatGPT.app`。
+- 可用的 SOCKS5 服务端；认证为可选项。
 
-## 使用方法
+旧版 `/Applications/Codex.app` 不受支持。
 
-1. 从 release 下载 `Codex Proxy.app.zip`，解压后把 `Codex Proxy.app` 放到 `/Applications`。
-2. 打开 `Codex Proxy.app`。
-3. 在 `Proxies` 页面配置代理名称、SOCKS5 host、端口，以及是否启用 HTTP bridge。如果 SOCKS5 需要认证，勾选 `Use authentication` 后填写用户名和密码。
-4. 在 `Bypass` 页面配置不走代理的地址、域名、IP 或 CIDR。
-5. 点击 `Save` 保存配置，或点击 `Launch Codex` 保存配置并启动 Codex。
+## 安装与使用
 
-`Use local HTTP bridge` 旁边的 `?` 按钮会解释这个选项的用途。简单来说，如果登录正常，但对话、app-server 请求或插件市场加载异常，可以尝试开启它。
+1. 从 [Releases](../../releases) 下载 `ChatGPT Proxy.app.zip`。
+2. 解压后，把 `ChatGPT Proxy.app` 拖到 `/Applications`。从旧版升级时，可在确认新版本正常后删除旧的 `Codex Proxy.app`。
+3. 打开 `ChatGPT Proxy.app`，首次运行时按 macOS 提示允许本地网络访问。
+4. 在 `Proxies` 中填写 SOCKS5 主机、端口和可选认证信息；按需启用 `Use local HTTP bridge`。
+5. 在 `Bypass` 中填写应直接连接的主机、域名、IP 或 CIDR。
+6. 点击 `Save` 仅保存配置，或点击 `Launch ChatGPT` 保存并以当前配置启动 ChatGPT。
 
-界面里的修改会先保存在窗口内存中。`Save` 会写入 `codex-proxy.conf` 但不启动 Codex；`Launch Codex` 会先保存，再按当前配置启动 Codex；`Cancel` 会退出启动器，未保存的修改不会写入配置文件。
+配置只在 ChatGPT 启动时读取。若 ChatGPT 已在运行，推荐选择 `Quit and Relaunch`，以确保当前代理生效。
 
-如果 Codex 已经在运行，启动器会提示你是否退出当前 Codex 并用新的代理配置重新启动。代理环境变量和 Chromium 代理参数只在进程启动时生效，因此修改配置后建议选择退出并重启。
+## HTTP bridge
 
-配置会保存在：
+正常情况下，ChatGPT 的 Chromium 网络请求可直接使用 SOCKS5。部分内部 HTTP 客户端对 SOCKS5 环境变量的支持不完整时，可能出现登录正常但对话、内部请求或插件市场超时/加载不完整的情况。
+
+为对应代理启用 `Use local HTTP bridge` 后，启动器只在本机 `127.0.0.1` 上临时启动一个 HTTP CONNECT bridge，再将流量转发至该 SOCKS5 服务器。bridge 会随 ChatGPT 进程结束而停止；启动器不会改动系统 HTTP 代理。
+
+## 配置与隐私
+
+本地配置位于：
 
 ```text
-~/Library/Application Support/Codex Proxy/codex-proxy.conf
+~/Library/Application Support/ChatGPT Proxy/chatgpt-proxy.conf
 ```
 
-如果配置文件不存在，启动器会从 app 内置的 `codex-proxy.conf.example` 自动创建一份。仓库根目录里的 `codex-proxy.conf` 只作为本地开发/旧版本迁移兼容，已被 `.gitignore` 忽略。
+首次从旧版启动器升级时，会自动复制旧的本地配置到新目录。该迁移仅用于保留你的配置；启动器不会再启动旧版 Codex Desktop。
 
-## Codex 已经运行时
+真实配置可能含有代理地址、内网规则和认证信息。请勿提交或分享它；仓库只提供公开的 [chatgpt-proxy.conf.example](chatgpt-proxy.conf.example) 模板。
 
-如果点击 `Launch Codex` 时检测到 Codex 已经在运行，启动器会显示两个选项：
+默认直连排除项包含 `localhost`、回环地址、`.local`、私有 IPv4 网段与常见本地 IPv6 网段。所有排除项均可在界面中修改或删除。
 
-- `Quit and Relaunch`：推荐。先温和退出正在运行的 Codex，再用当前代理配置重新启动，最能确保代理生效。
-- `Cancel`：取消启动。
+## 项目结构
 
-日常使用建议选择 `Quit and Relaunch`。
-
-## When Codex Is Already Running
-
-If Codex is already running, `Quit and Relaunch` is recommended because proxy settings only apply when the Codex process starts. `Cancel` keeps the current Codex session unchanged.
-
-## 配置建议
-
-如果 Codex 登录正常，但对话或插件市场超时，可以尝试为对应代理开启 `Use local HTTP bridge`。这会让 `HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY` 指向本地 HTTP bridge，再由 bridge 转发到 SOCKS5 代理。
-
-启动器会直接执行 `/Applications/Codex.app/Contents/MacOS/Codex` 并传入 Chromium 代理参数，而不是通过 `open --args` 启动。这样可以避免某些情况下代理参数没有被 Codex 新进程可靠接收。
-
-HTTP bridge 会在 Codex 运行期间保持可用。启动脚本会等待直接启动的 Codex 主进程退出；如果主进程退出后仍有 Codex helper 进程残留，才会低频等待这些进程结束，然后清理 bridge 和临时代理环境。
-
-常见直连排除项包括：
-
-```text
-localhost
-127.0.0.1
-::1
-*.local
-10.0.0.0/8
-172.16.0.0/12
-192.168.0.0/16
-fc00::/7
-fe80::/10
-```
-
-## 隐私与配置文件
-
-真实代理配置保存在本机的 `~/Library/Application Support/Codex Proxy/codex-proxy.conf` 中，可能包含私有代理地址、内网域名或个人网络信息。仓库只提供 `codex-proxy.conf.example` 作为公开模板。
-
-如果 SOCKS5 代理需要用户名/密码认证，可以在界面中填写 `Username` 和 `Password`。不需要认证时保持为空即可。当前版本会把这些值保存在本机配置文件中，请不要公开分享你的真实 `codex-proxy.conf`。
+- `ChatGPTProxyLauncher.swift`：原生 AppKit 启动器。
+- `chatgpt-proxy-launch.sh`：启动 ChatGPT 并注入代理参数。
+- `socks-http-bridge.mjs`：本地 HTTP CONNECT 到 SOCKS5 的桥接程序。
+- `chatgpt-proxy.conf.example`：公开配置模板。
 
 ## 构建
 
-这个 App 是单文件 AppKit 程序，可以用系统自带 Swift 编译器重新构建，不需要第三方依赖：
-
-```sh
-mkdir -p "Codex Proxy.app/Contents/MacOS" "Codex Proxy.app/Contents/Resources" .build/clang-module-cache
-cp codex-proxy-launch.sh "Codex Proxy.app/Contents/Resources/codex-proxy-launch.sh"
-cp codex-proxy.conf.example "Codex Proxy.app/Contents/Resources/codex-proxy.conf.example"
-cp socks-http-bridge.mjs "Codex Proxy.app/Contents/Resources/socks-http-bridge.mjs"
-chmod +x "Codex Proxy.app/Contents/Resources/codex-proxy-launch.sh"
-CLANG_MODULE_CACHE_PATH=.build/clang-module-cache \
-  swiftc -framework Cocoa CodexProxyLauncher.swift \
-  -o "Codex Proxy.app/Contents/MacOS/CodexProxyLauncher"
-```
+发布包已包含可直接使用的应用。源码使用系统 Swift/AppKit；bridge 会优先使用 ChatGPT Desktop 内置的 Node，因此不要求安装 Node 或其他第三方依赖。
 
 ## English
 
-Codex Proxy is a small macOS launcher for starting Codex Desktop with per-app proxy settings. It lets Codex use a SOCKS5 proxy without changing the system proxy, enabling a global VPN, or routing other applications through proxy/splitting software.
+ChatGPT Proxy is a native macOS launcher that starts **ChatGPT Desktop** with per-app SOCKS5 proxy settings. It does not change the system proxy, enable a global VPN, or route other applications through split-tunneling software.
 
-It supports multiple SOCKS5 profiles with optional username/password authentication, an optional local HTTP CONNECT bridge, an editable bypass list, English/Chinese UI switching, and a prompt to quit and relaunch Codex when it is already running. Username and password fields are hidden by default; enable **Use authentication** only when your SOCKS5 server requires credentials.
+It supports multiple SOCKS5 profiles, optional username/password authentication, editable bypass rules, a local HTTP CONNECT bridge, and English/Chinese UI switching. The launcher targets `/Applications/ChatGPT.app` only; legacy `Codex.app` is not supported.
 
-Use `codex-proxy.conf.example` as the public template. Keep your real `codex-proxy.conf` private.
+Download `ChatGPT Proxy.app.zip` from [Releases](../../releases), move the app to `/Applications`, configure a proxy, then choose **Launch ChatGPT**. Your private configuration is stored at:
+
+```text
+~/Library/Application Support/ChatGPT Proxy/chatgpt-proxy.conf
+```
+
+Do not publish that file. The repository contains only the safe [configuration template](chatgpt-proxy.conf.example).
