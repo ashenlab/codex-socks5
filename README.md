@@ -71,14 +71,51 @@ ChatGPT Proxy 只在启动 ChatGPT 时注入代理环境变量与 Chromium 代�
 
 ## English
 
-ChatGPT Proxy is a native macOS launcher that starts **ChatGPT Desktop** with per-app SOCKS5 proxy settings. It does not change the system proxy, enable a global VPN, or route other applications through split-tunneling software.
+ChatGPT Proxy is a native macOS launcher that starts **ChatGPT Desktop** with per-app SOCKS5 proxy settings. It does not change the system proxy, enable a global VPN, or route other applications through split-tunneling software. Only ChatGPT uses the selected proxy; other applications keep their existing network behavior.
 
-It supports multiple SOCKS5 profiles, optional username/password authentication, editable bypass rules, a local HTTP CONNECT bridge, and English/Chinese UI switching. The launcher targets `/Applications/ChatGPT.app` only; legacy `Codex.app` is not supported.
+### Features
 
-Download `ChatGPT.Proxy.app.zip` from [Releases](../../releases), move the app to `/Applications`, configure a proxy, then choose **Launch ChatGPT**. Your private configuration is stored at:
+- Per-app SOCKS5 proxying for ChatGPT Desktop only.
+- Multiple proxy profiles with optional username/password authentication.
+- Editable direct-connect bypass rules for hosts, domains, IP addresses, and CIDRs.
+- Optional local HTTP CONNECT bridge for internal clients with incomplete SOCKS5 support.
+- English/Chinese UI switching and a prompt to quit and relaunch ChatGPT when needed.
+
+### Requirements
+
+- macOS 10.13 or later.
+- The current ChatGPT Desktop app installed at `/Applications/ChatGPT.app`.
+- A reachable SOCKS5 server; authentication is optional.
+
+Legacy `/Applications/Codex.app` is not supported.
+
+### Install and Use
+
+1. Download `ChatGPT.Proxy.app.zip` from [Releases](../../releases).
+2. Unzip it and move `ChatGPT Proxy.app` to `/Applications`.
+3. Open the app and allow local network access if macOS asks for it.
+4. Add a SOCKS5 host, port, and optional credentials under **Proxies**. Enable **Use local HTTP bridge** when appropriate.
+5. Add addresses that must connect directly under **Bypass**.
+6. Choose **Save** to keep the configuration, or **Launch ChatGPT** to save and start ChatGPT with the selected proxy.
+
+Proxy settings apply only when ChatGPT starts. If ChatGPT is already running, choose **Quit and Relaunch** to ensure the new settings take effect.
+
+When upgrading from the previous Codex Proxy launcher, verify the new app first and then remove the old `Codex Proxy.app` from `/Applications` if desired. Your previous local configuration is migrated automatically once.
+
+### Local HTTP Bridge
+
+Most Chromium traffic can use SOCKS5 directly. Some internal HTTP clients may not honor SOCKS5 environment variables consistently, which can result in successful login but failed chats, internal requests, or a partially loaded plugin marketplace.
+
+For that proxy profile, enable **Use local HTTP bridge**. The launcher temporarily opens an HTTP CONNECT bridge on `127.0.0.1` and forwards it to the selected SOCKS5 server. The bridge stops when the ChatGPT process group exits, and it never changes the system HTTP proxy.
+
+### Privacy and Configuration
+
+Your private configuration is stored at:
 
 ```text
 ~/Library/Application Support/ChatGPT Proxy/chatgpt-proxy.conf
 ```
 
-Do not publish that file. The repository contains only the safe [configuration template](chatgpt-proxy.conf.example).
+It may contain proxy endpoints, bypass rules, and credentials. Do not publish it. This repository contains only the safe [configuration template](chatgpt-proxy.conf.example).
+
+The default bypass list contains localhost, loopback addresses, `.local`, private IPv4 ranges, and common local IPv6 ranges. Every bypass item can be changed or removed in the app.
